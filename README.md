@@ -16,7 +16,6 @@ Provide a **simple** usage of sensors (hardware) with a **simple** way to publis
 >- links I2C, MQTT, ESP8266
 >- BOM 
 >- BOM links
->- Build instructions
 >- Configuration instructions (Wifi)
 >- images
 
@@ -31,3 +30,12 @@ Provide a **simple** usage of sensors (hardware) with a **simple** way to publis
 | BMP280   |       | Sensor : temperature, pressure and humidity |
 | BH1750   |       | Sensor : light |
 | SHT21    |       | Sensor : temperature and humidity  |
+
+### Build
+
+Thanks to PlatformIO it is pretty simple to Build.
+* install [PlatformIO](http://platformio.org/platformio-ide)
+* install shell commands
+* using a shell run : 
+```pio run```
+ 
