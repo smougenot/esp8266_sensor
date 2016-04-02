@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/smougenot/esp8266_sensor.svg?branch=master)](https://travis-ci.org/smougenot/esp8266_sensor)
+
 # esp8266_sensor
 ESP8266 micro controller and I2C connected sensors pushing messages over MQTT
 
