@@ -88,7 +88,7 @@ void info(){
     Serial.print(" , ");
     Serial.println(topicCmd);
     Serial.print("wait (ms)");
-    Serial.println(LOOP_WAIT);  
+    Serial.println(LOOP_WAIT);
 }
 
 void setup()
@@ -101,7 +101,7 @@ void setup()
 
     client.setCallback(callback);
     reconnect();
-    
+
     //
     // Display
     //
@@ -121,17 +121,17 @@ void setup()
     Serial.println("Sensor ready");
 
     // première mesure
-    Serial.println("Lancement de la première mesure");  
+    Serial.println("Lancement de la première mesure");
     displayAllOff();
     work();
-    
+
     Serial.println("Type,\tstatus,\tHumidity (%),\tTemperature (C)\tTime (us)");
 }
 
 
 void loop()
 {
-  
+
   // check incomming/connection
   checkClient();
 
@@ -218,7 +218,7 @@ void reconnect() {
   if(WiFi.status() != WL_CONNECTED){
     setup_wifi_multi();
   }
-  
+
   // Loop until we're reconnected to MQTT server
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
@@ -255,7 +255,7 @@ void work(){
 
 char *ftoa(char *a, double f, int precision){
  long p[] = {0,10,100,1000,10000,100000,1000000,10000000,100000000};
- 
+
  char *ret = a;
  long heiltal = (long)f;
  itoa(heiltal, a, 10);
@@ -341,11 +341,11 @@ int BH1750_Read(int address) //
     buff[i] = Wire.read();  // receive one byte
     i++;
   }
-  Wire.endTransmission();  
+  Wire.endTransmission();
   return i;
 }
- 
-void BH1750_Init(int address) 
+
+void BH1750_Init(int address)
 {
   Wire.beginTransmission(address);
   Wire.write(0x10);//1lx reolution 120ms
@@ -357,7 +357,7 @@ void trace(){
     if(loopCnt++ %20 == 0){
       printHeader();
     }
-    printData(temperature, pressure, altitude, light);  
+    printData(temperature, pressure, altitude, light);
 }
 
 void printData(float aTemperature, int aPressure, float aAltitude, uint16_t aLight){
@@ -371,7 +371,7 @@ void printData(float aTemperature, int aPressure, float aAltitude, uint16_t aLig
 }
 
 void printHeader(){
-  Serial.println("Temperature °C\tPressure\tAltitude\tlight");  
+  Serial.println("Temperature °C\tPressure\tAltitude\tlight");
 }
 
 
@@ -406,11 +406,9 @@ void displayAll(uint8_t aValue){
  * Display on the embedded hardware
  */
 void displayTemperature(){
-    //Serial.print("Display temperature : ");  
+    //Serial.print("Display temperature : ");
     //Serial.print(temperature, 1);
     //Serial.println("°C");
-  
+
     display.showNumberDec(temperature * 10, false, 4, 0);
 }
-
-
