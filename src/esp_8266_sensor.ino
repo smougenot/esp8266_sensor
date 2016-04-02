@@ -315,22 +315,6 @@ void readSensor(){
     }
 }
 
-uint16_t readLight(){
-  int i;
-  uint16_t val=-1;
-  BH1750_Init(BH1750address);
-  delay(100);
- 
-  if(2==BH1750_Read(BH1750address)) {
-    val=((buff[0]<<8)|buff[1])/1.2;
-    //Serial.print(val,DEC);     
-    //Serial.println("lx"); 
-  } else {
-    Serial.println("can't read light"); 
-  }
-  return val;
-}
-
 int BH1750_Read(int address) //
 {
   int i=0;
@@ -350,6 +334,22 @@ void BH1750_Init(int address)
   Wire.beginTransmission(address);
   Wire.write(0x10);//1lx reolution 120ms
   Wire.endTransmission();
+}
+
+uint16_t readLight(){
+  int i;
+  uint16_t val=-1;
+  BH1750_Init(BH1750address);
+  delay(100);
+
+  if(2==BH1750_Read(BH1750address)) {
+    val=((buff[0]<<8)|buff[1])/1.2;
+    //Serial.print(val,DEC);
+    //Serial.println("lx");
+  } else {
+    Serial.println("can't read light");
+  }
+  return val;
 }
 
 void trace(){
