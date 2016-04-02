@@ -1,8 +1,8 @@
 [![Build Status](https://travis-ci.org/smougenot/esp8266_sensor.svg?branch=master)](https://travis-ci.org/smougenot/esp8266_sensor)
+[![Join the chat at https://gitter.im/smougenot/esp8266_sensor](https://badges.gitter.im/smougenot/esp8266_sensor.svg)](https://gitter.im/smougenot/esp8266_sensor?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 # esp8266_sensor
 
-[![Join the chat at https://gitter.im/smougenot/esp8266_sensor](https://badges.gitter.im/smougenot/esp8266_sensor.svg)](https://gitter.im/smougenot/esp8266_sensor?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 ESP8266 micro controller and I2C connected sensors pushing messages over MQTT
 
 
