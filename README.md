@@ -26,5 +26,6 @@ Provide a **simple** usage of sensors (hardware) with a **simple** way to publis
 | :------- | ----: | ---- |
 | NodeMCU  | $5    | Microcontroller compliant with Arduino with Wifi     |
 | BMP180   |       | Sensor : temperature and pressure |
+| BMP280   |       | Sensor : temperature, pressure and humidity |
 | BH1750   |       | Sensor : light |
 | SHT21    |       | Sensor : temperature and humidity  |

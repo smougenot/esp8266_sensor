@@ -47,10 +47,6 @@ const char* topicCmd    = "/esp/1/cmd";
 const char* topicStatus = "/esp/1/status";
 const char* clientId    = "ESP8266Client1";
 
-// network.
-//const char* ssid = "MaisonSMT";
-//const char* password = "m3f13t01";
-
 // Home router
 const char* ssid_home = "MaisonSMT";
 const char* password_home = "m3f13t01";
