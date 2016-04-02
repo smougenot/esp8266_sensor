@@ -47,10 +47,6 @@ const char* topicCmd    = "/esp/1/cmd";
 const char* topicStatus = "/esp/1/status";
 const char* clientId    = "ESP8266Client1";
 
-// network.
-//const char* ssid = "MaisonSMT";
-//const char* password = "m3f13t01";
-
 // Home router
 const char* ssid_home = "MaisonSMT";
 const char* password_home = "m3f13t01";
@@ -92,7 +88,7 @@ void info(){
     Serial.print(" , ");
     Serial.println(topicCmd);
     Serial.print("wait (ms)");
-    Serial.println(LOOP_WAIT);  
+    Serial.println(LOOP_WAIT);
 }
 
 void setup()
@@ -105,7 +101,7 @@ void setup()
 
     client.setCallback(callback);
     reconnect();
-    
+
     //
     // Display
     //
@@ -125,17 +121,17 @@ void setup()
     Serial.println("Sensor ready");
 
     // première mesure
-    Serial.println("Lancement de la première mesure");  
+    Serial.println("Lancement de la première mesure");
     displayAllOff();
     work();
-    
+
     Serial.println("Type,\tstatus,\tHumidity (%),\tTemperature (C)\tTime (us)");
 }
 
 
 void loop()
 {
-  
+
   // check incomming/connection
   checkClient();
 
@@ -222,7 +218,7 @@ void reconnect() {
   if(WiFi.status() != WL_CONNECTED){
     setup_wifi_multi();
   }
-  
+
   // Loop until we're reconnected to MQTT server
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
@@ -259,7 +255,7 @@ void work(){
 
 char *ftoa(char *a, double f, int precision){
  long p[] = {0,10,100,1000,10000,100000,1000000,10000000,100000000};
- 
+
  char *ret = a;
  long heiltal = (long)f;
  itoa(heiltal, a, 10);
@@ -319,22 +315,6 @@ void readSensor(){
     }
 }
 
-uint16_t readLight(){
-  int i;
-  uint16_t val=-1;
-  BH1750_Init(BH1750address);
-  delay(100);
- 
-  if(2==BH1750_Read(BH1750address)) {
-    val=((buff[0]<<8)|buff[1])/1.2;
-    //Serial.print(val,DEC);     
-    //Serial.println("lx"); 
-  } else {
-    Serial.println("can't read light"); 
-  }
-  return val;
-}
-
 int BH1750_Read(int address) //
 {
   int i=0;
@@ -345,15 +325,31 @@ int BH1750_Read(int address) //
     buff[i] = Wire.read();  // receive one byte
     i++;
   }
-  Wire.endTransmission();  
+  Wire.endTransmission();
   return i;
 }
- 
-void BH1750_Init(int address) 
+
+void BH1750_Init(int address)
 {
   Wire.beginTransmission(address);
   Wire.write(0x10);//1lx reolution 120ms
   Wire.endTransmission();
+}
+
+uint16_t readLight(){
+  int i;
+  uint16_t val=-1;
+  BH1750_Init(BH1750address);
+  delay(100);
+
+  if(2==BH1750_Read(BH1750address)) {
+    val=((buff[0]<<8)|buff[1])/1.2;
+    //Serial.print(val,DEC);
+    //Serial.println("lx");
+  } else {
+    Serial.println("can't read light");
+  }
+  return val;
 }
 
 void trace(){
@@ -361,7 +357,7 @@ void trace(){
     if(loopCnt++ %20 == 0){
       printHeader();
     }
-    printData(temperature, pressure, altitude, light);  
+    printData(temperature, pressure, altitude, light);
 }
 
 void printData(float aTemperature, int aPressure, float aAltitude, uint16_t aLight){
@@ -375,7 +371,7 @@ void printData(float aTemperature, int aPressure, float aAltitude, uint16_t aLig
 }
 
 void printHeader(){
-  Serial.println("Temperature °C\tPressure\tAltitude\tlight");  
+  Serial.println("Temperature °C\tPressure\tAltitude\tlight");
 }
 
 
@@ -410,11 +406,9 @@ void displayAll(uint8_t aValue){
  * Display on the embedded hardware
  */
 void displayTemperature(){
-    //Serial.print("Display temperature : ");  
+    //Serial.print("Display temperature : ");
     //Serial.print(temperature, 1);
     //Serial.println("°C");
-  
+
     display.showNumberDec(temperature * 10, false, 4, 0);
 }
-
-

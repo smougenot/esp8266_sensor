@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/smougenot/esp8266_sensor.svg?branch=master)](https://travis-ci.org/smougenot/esp8266_sensor)
+
 # esp8266_sensor
 ESP8266 micro controller and I2C connected sensors pushing messages over MQTT
 
@@ -26,5 +28,6 @@ Provide a **simple** usage of sensors (hardware) with a **simple** way to publis
 | :------- | ----: | ---- |
 | NodeMCU  | $5    | Microcontroller compliant with Arduino with Wifi     |
 | BMP180   |       | Sensor : temperature and pressure |
+| BMP280   |       | Sensor : temperature, pressure and humidity |
 | BH1750   |       | Sensor : light |
 | SHT21    |       | Sensor : temperature and humidity  |
