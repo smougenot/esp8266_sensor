@@ -1,6 +1,6 @@
 // BMP180
 #include <Wire.h>
-#include <Adafruit_BMP085.h>
+#include <Adafruit_BMP085_U.h>
 // Display
 #include <TM1637Display.h>
 // send messages
@@ -36,7 +36,7 @@ byte buff[2];
 // EOC is not used, it signifies an end of conversion
 // XCLR is a reset pin, also not used here
 
-Adafruit_BMP085 bmp;
+Adafruit_BMP085_Unified bmp;
 
 // MQTT
 #define CLIENT_ID     "1"
@@ -300,12 +300,22 @@ void sendmsgToTopic(){
 
 void readSensor(){
     //Serial.println("Read bpm180");
-    float myTemperature = bmp.readTemperature();
-    if(myTemperature<150){
-      // assumed correct read
-      temperature = myTemperature;
-      pressure = bmp.readPressure();
-      altitude = bmp.readAltitude();
+    sensors_event_t event;
+    bmp.getEvent(&event);
+
+    // Do we have datas
+    if (event.pressure) {
+      float myTemperature;
+      bmp.getTemperature(&myTemperature);
+      if(myTemperature<150){
+        // assumed correct read
+        temperature = myTemperature;
+        pressure = event.pressure;
+        altitude = bmp.pressureToAltitude(
+          SENSORS_PRESSURE_SEALEVELHPA,
+          event.pressure
+        );
+      }
     }
     //Serial.println("Read bh1750");
     uint16_t myLight = readLight();

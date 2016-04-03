@@ -16,7 +16,7 @@ Provide a **simple** usage of sensors (hardware) with a **simple** way to publis
 >
 > TODO:
 >- links I2C, MQTT, ESP8266
->- BOM 
+>- BOM
 >- BOM links
 >- Configuration instructions (Wifi)
 >- images
@@ -29,7 +29,7 @@ Provide a **simple** usage of sensors (hardware) with a **simple** way to publis
 | :------- | ----: | ---- |
 | NodeMCU  | $5    | Microcontroller compliant with Arduino with Wifi     |
 | BMP180   |       | Sensor : temperature and pressure |
-| BMP280   |       | Sensor : temperature, pressure and humidity |
+| BME280   |       | Sensor : temperature, pressure and humidity |
 | BH1750   |       | Sensor : light |
 | SHT21    |       | Sensor : temperature and humidity  |
 
@@ -40,4 +40,3 @@ Thanks to PlatformIO it is pretty simple to Build.
 * install shell commands
 * using a shell run : 
 ```pio run```
- 
