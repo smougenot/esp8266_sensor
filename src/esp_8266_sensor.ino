@@ -39,13 +39,13 @@ byte buff[2];
 Adafruit_BMP085_Unified bmp;
 
 // MQTT
-#define CLIENT_ID     "1"
+#define CLIENT_ID     "2"
 const char* mqtt_server;
 const char* mqtt_server_home = "192.168.1.17";
 const char* mqtt_server_mobile = "192.168.43.219";
-const char* topicCmd    = "/esp/1/cmd";
-const char* topicStatus = "/esp/1/status";
-const char* clientId    = "ESP8266Client1";
+const char* topicCmd    = "/esp/2/cmd";
+const char* topicStatus = "/esp/2/status";
+const char* clientId    = "ESP8266Client2";
 
 // Home router
 const char* ssid_home = "MaisonSMT";
