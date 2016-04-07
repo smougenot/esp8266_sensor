@@ -335,6 +335,7 @@ void displaySensorDetails(void) {
   sensor_t sensor;
   bmp.getSensor(&sensor);
   Serial.println("------------------------------------");
+  Serial.println("              BMP                   ");
   Serial.print  ("Sensor:       "); Serial.println(sensor.name);
   Serial.print  ("Driver Ver:   "); Serial.println(sensor.version);
   Serial.print  ("Unique ID:    "); Serial.println(sensor.sensor_id);
