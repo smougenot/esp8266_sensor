@@ -1,4 +1,4 @@
-// BMP180
+// I2C sensors
 #include <Wire.h>
 #include <Adafruit_BMP085_U.h>
 // Display
@@ -119,6 +119,7 @@ void setup()
       while (1) {}
     }
     Serial.println("Sensor ready");
+    displaySensorDetails();
 
     // première mesure
     Serial.println("Lancement de la première mesure");
@@ -323,6 +324,26 @@ void readSensor(){
       // assumed correct read
       light = myLight;
     }
+}
+/**************************************************************************/
+/*
+    Displays some basic information on this sensor from the unified
+    sensor API sensor_t type (see Adafruit_Sensor for more information)
+*/
+/**************************************************************************/
+void displaySensorDetails(void) {
+  sensor_t sensor;
+  bmp.getSensor(&sensor);
+  Serial.println("------------------------------------");
+  Serial.print  ("Sensor:       "); Serial.println(sensor.name);
+  Serial.print  ("Driver Ver:   "); Serial.println(sensor.version);
+  Serial.print  ("Unique ID:    "); Serial.println(sensor.sensor_id);
+  Serial.print  ("Max Value:    "); Serial.print(sensor.max_value); Serial.println(" hPa");
+  Serial.print  ("Min Value:    "); Serial.print(sensor.min_value); Serial.println(" hPa");
+  Serial.print  ("Resolution:   "); Serial.print(sensor.resolution); Serial.println(" hPa");
+  Serial.println("------------------------------------");
+  Serial.println("");
+  delay(500);
 }
 
 int BH1750_Read(int address) //
