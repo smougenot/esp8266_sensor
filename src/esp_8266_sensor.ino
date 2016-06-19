@@ -387,7 +387,7 @@ void sendLight(uint16_t aLight){
 
 void sendUVLight(uint16_t aUvLight){
   snprintf (msg, sizeof(msg), "%d", aUvLight);
-  snprintf (topic, sizeof(topic), "%s/%s", topicStatus, "UV");
+  snprintf (topic, sizeof(topic), "%s/%s", topicStatus.c_str(), "UV");
   sendmsgToTopic();
 }
 
