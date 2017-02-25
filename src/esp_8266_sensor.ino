@@ -52,19 +52,9 @@ Adafruit_BMP085_Unified bmp;
 char mqtt_server[120]="mqtt.broker.net";
 char mqtt_port_config[5]="1883";
 int mqtt_port = 1883;
-const char* mqtt_server_home = "192.168.1.17";
-const char* mqtt_server_mobile = "192.168.43.219";
 const char* topicCmd    = "/esp/1/cmd";
 const char* topicStatus = "/esp/1/status";
 const char* clientId    = "ESP8266Client1";
-
-// Home router
-const char* ssid_home = "MaisonSMT";
-const char* password_home = "m3f13t01";
-
-// Alternate router for mobile demos
-const char* ssid_mobile = "Xperia S_78d6";
-const char* password_mobile = "pobeda0117";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -91,10 +81,6 @@ void info(){
     Serial.print("VERSION: ");
     Serial.println(PRJ_VERSION);
     Serial.println();
-    Serial.print("Wifi: ");
-    Serial.print(ssid_home);
-    Serial.print("|");
-    Serial.println(ssid_mobile);
     Serial.print("mqtt: ");
     Serial.print(mqtt_server);
     Serial.print(":");
@@ -237,8 +223,6 @@ void setup()
 
     fsInit();
 
-    info();
-
     initWifiManager();
     doSaveConfig();
 
@@ -247,10 +231,10 @@ void setup()
     strcpy(mqtt_port_config, custom_mqtt_port.getValue());
     // strcpy(blynk_token, custom_blynk_token.getValue());
 
-    // TODO: convert port
+    // convert port
+    mqtt_port = String(mqtt_port_config).toInt();
 
-    // network
-    // setup_wifi_multi();
+    info();
 
     // MQTT
     client.setCallback(callback);
@@ -297,48 +281,6 @@ void loop()
     work();
   }
 }
-
-// void setup_wifi_multi() {
-//     if(!setup_wifi(ssid_mobile, password_mobile)){
-//       if(!setup_wifi(ssid_home, password_home)){
-//         // loop will force reboot
-//         while (1) {}
-//       }else {
-//         mqtt_server = mqtt_server_home;
-//       }
-//     }else {
-//       mqtt_server = mqtt_server_mobile;
-//     }
-//     Serial.print("Mqtt server set to ");
-//     Serial.println(mqtt_server);
-//     client.setServer(mqtt_server, mqtt_port);
-// }
-//
-// boolean setup_wifi(const char* ssid, const char* password) {
-//
-//   delay(10);
-//   // We start by connecting to a WiFi network
-//   Serial.println();
-//   Serial.print("Connecting to ");
-//   Serial.println(ssid);
-//
-//   WiFi.begin(ssid, password);
-//
-//   int cpt=0;
-//   while (WiFi.status() != WL_CONNECTED) {
-//     if(++cpt > 50){
-//       return false;
-//     }
-//     Serial.print(".");
-//     delay(200);
-//   }
-//
-//   Serial.println("");
-//   Serial.println("WiFi connected");
-//   Serial.print("IP address: ");
-//   Serial.println(WiFi.localIP());
-//   return true;
-// }
 
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
