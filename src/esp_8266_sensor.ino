@@ -1,10 +1,19 @@
+#include <FS.h>                   //this needs to be first, or it all crashes and burns...
+
+//needed for library
+#include <DNSServer.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
+
+#include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
+
 // I2C sensors
 #include <Wire.h>
 #include <Adafruit_BMP085_U.h>
 // Display
 #include <TM1637Display.h>
-// send messages
-#include <ESP8266WiFi.h>
+// send MQTT messages
 #include <PubSubClient.h>
 
 #define PRJ_VERSION 2
@@ -40,20 +49,12 @@ Adafruit_BMP085_Unified bmp;
 
 // MQTT
 #define CLIENT_ID     "1"
-const char* mqtt_server;
-const char* mqtt_server_home = "192.168.1.17";
-const char* mqtt_server_mobile = "192.168.43.219";
+char mqtt_server[120]="mqtt.broker.net";
+char mqtt_port_config[5]="1883";
+int mqtt_port = 1883;
 const char* topicCmd    = "/esp/1/cmd";
 const char* topicStatus = "/esp/1/status";
 const char* clientId    = "ESP8266Client1";
-
-// Home router
-const char* ssid_home = "MaisonSMT";
-const char* password_home = "m3f13t01";
-
-// Alternate router for mobile demos
-const char* ssid_mobile = "Xperia S_78d6";
-const char* password_mobile = "pobeda0117";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -72,17 +73,18 @@ long lastCheck = 0;
 char msg[50];
 char topic[50];
 
+/** flag for saving data */
+bool shouldSaveConfig = false;
+
 void info(){
     Serial.println("sensor to mqtt");
     Serial.print("VERSION: ");
     Serial.println(PRJ_VERSION);
     Serial.println();
-    Serial.print("Wifi: ");
-    Serial.print(ssid_home);
-    Serial.print("|");
-    Serial.println(ssid_mobile);
     Serial.print("mqtt: ");
-    Serial.println(mqtt_server);
+    Serial.print(mqtt_server);
+    Serial.print(":");
+    Serial.println(mqtt_port);
     Serial.print("topics: ");
     Serial.print(topicStatus);
     Serial.print(" , ");
@@ -91,15 +93,152 @@ void info(){
     Serial.println(LOOP_WAIT);
 }
 
+//callback notifying us of the need to save config
+void saveConfigCallback () {
+  Serial.println("Should save config");
+  shouldSaveConfig = true;
+}
+
+//save the custom parameters to FS
+void doSaveConfig() {
+  if (shouldSaveConfig) {
+    Serial.println("saving config");
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject& json = jsonBuffer.createObject();
+    json["mqtt_server"] = mqtt_server;
+    json["mqtt_port"] = mqtt_port;
+    // json["blynk_token"] = blynk_token;
+
+    File configFile = SPIFFS.open("/config.json", "w");
+    if (!configFile) {
+      Serial.println("failed to open config file for writing");
+    }
+
+    json.printTo(Serial);
+    json.printTo(configFile);
+    configFile.close();
+    //end save
+  }
+}
+
+void fsInit() {
+
+  //clean FS, for testing
+  //SPIFFS.format();
+
+  //read configuration from FS json
+  Serial.println("mounting FS...");
+
+  if (SPIFFS.begin()) {
+    Serial.println("mounted file system");
+    if (SPIFFS.exists("/config.json")) {
+      //file exists, reading and loading
+      Serial.println("reading config file");
+      File configFile = SPIFFS.open("/config.json", "r");
+      if (configFile) {
+        Serial.println("opened config file");
+        size_t size = configFile.size();
+        // Allocate a buffer to store contents of the file.
+        std::unique_ptr<char[]> buf(new char[size]);
+
+        configFile.readBytes(buf.get(), size);
+        DynamicJsonBuffer jsonBuffer;
+        JsonObject& json = jsonBuffer.parseObject(buf.get());
+        json.printTo(Serial);
+        if (json.success()) {
+          Serial.println("\nparsed json");
+
+          strcpy(mqtt_server, json["mqtt_server"]);
+          strcpy(mqtt_port_config, json["mqtt_port"]);
+
+        } else {
+          Serial.println("failed to load json config");
+        }
+      }
+    }
+  } else {
+    Serial.println("failed to mount FS");
+  }
+  //end read
+}
+
+
+WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 120);
+WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port_config, 5);
+
+void initWifiManager() {
+
+
+  // The extra parameters to be configured (can be either global or just in the setup)
+  // After connecting, parameter.getValue() will get you the configured value
+  // id/name placeholder/prompt default length
+  // WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 120);
+  // WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port_config, 5);
+  // WiFiManagerParameter custom_blynk_token("blynk", "blynk token", blynk_token, 32);
+
+  //WiFiManager
+  //Local intialization. Once its business is done, there is no need to keep it around
+  WiFiManager wifiManager;
+
+  //set config save notify callback
+  wifiManager.setSaveConfigCallback(saveConfigCallback);
+
+  //set static ip
+  // wifiManager.setSTAStaticIPConfig(IPAddress(192,168,4,127), IPAddress(192,168,4,1), IPAddress(255,255,255,0));
+
+  //add all your parameters here
+  wifiManager.addParameter(&custom_mqtt_server);
+  wifiManager.addParameter(&custom_mqtt_port);
+  // wifiManager.addParameter(&custom_blynk_token);
+
+  //reset settings - for testing
+  //wifiManager.resetSettings();
+
+  //set minimu quality of signal so it ignores AP's under that quality
+  //defaults to 8%
+  //wifiManager.setMinimumSignalQuality();
+
+  //sets timeout until configuration portal gets turned off
+  //useful to make it all retry or go to sleep
+  //in seconds
+  //wifiManager.setTimeout(120);
+
+  //fetches ssid and pass and tries to connect
+  //if it does not connect it starts an access point with the specified name
+  //here  "AutoConnectAP"
+  //and goes into a blocking loop awaiting configuration
+  String ssid = "ESP_autoconnect_" + String(ESP.getChipId());
+  if (!wifiManager.autoConnect(ssid.c_str(), "password")) {
+    Serial.println("failed to connect and hit timeout");
+    delay(3000);
+    //reset and try again, or maybe put it to deep sleep
+    ESP.reset();
+    delay(5000);
+  }
+}
+
 void setup()
 {
     Serial.begin(115200);
+
+    fsInit();
+
+    initWifiManager();
+    doSaveConfig();
+
+    //read updated parameters
+    strcpy(mqtt_server, custom_mqtt_server.getValue());
+    strcpy(mqtt_port_config, custom_mqtt_port.getValue());
+    // strcpy(blynk_token, custom_blynk_token.getValue());
+
+    // convert port
+    mqtt_port = String(mqtt_port_config).toInt();
+
     info();
 
-    // network
-    setup_wifi_multi();
-
+    // MQTT
     client.setCallback(callback);
+    client.setServer(mqtt_server, mqtt_port);
     reconnect();
 
     //
@@ -143,48 +282,6 @@ void loop()
   }
 }
 
-void setup_wifi_multi() {
-    if(!setup_wifi(ssid_mobile, password_mobile)){
-      if(!setup_wifi(ssid_home, password_home)){
-        // loop will force reboot
-        while (1) {}
-      }else {
-        mqtt_server = mqtt_server_home;
-      }
-    }else {
-      mqtt_server = mqtt_server_mobile;
-    }
-    Serial.print("Mqtt server set to ");
-    Serial.println(mqtt_server);
-    client.setServer(mqtt_server, 1883);
-}
-
-boolean setup_wifi(const char* ssid, const char* password) {
-
-  delay(10);
-  // We start by connecting to a WiFi network
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-
-  WiFi.begin(ssid, password);
-
-  int cpt=0;
-  while (WiFi.status() != WL_CONNECTED) {
-    if(++cpt > 50){
-      return false;
-    }
-    Serial.print(".");
-    delay(200);
-  }
-
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-  return true;
-}
-
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
   Serial.print(topic);
@@ -217,7 +314,7 @@ void reconnect() {
 
   //reconnect wifi first
   if(WiFi.status() != WL_CONNECTED){
-    setup_wifi_multi();
+    ESP.reset();
   }
 
   // Loop until we're reconnected to MQTT server
