@@ -51,6 +51,8 @@ Adafruit_BMP085_Unified bmp;
 #define CLIENT_ID     "1"
 char mqtt_server[120]="mqtt.broker.net";
 char mqtt_port_config[5]="1883";
+char mqtt_user[120]="";
+char mqtt_password[120]="";
 int mqtt_port = 1883;
 const char* topicCmd    = "/esp/1/cmd";
 const char* topicStatus = "/esp/1/status";
@@ -107,7 +109,8 @@ void doSaveConfig() {
     JsonObject& json = jsonBuffer.createObject();
     json["mqtt_server"] = mqtt_server;
     json["mqtt_port"] = mqtt_port;
-    // json["blynk_token"] = blynk_token;
+    json["mqtt_user"] = mqtt_user;
+    json["mqtt_password"] = mqtt_password;
 
     File configFile = SPIFFS.open("/config.json", "w");
     if (!configFile) {
@@ -150,6 +153,8 @@ void fsInit() {
 
           strcpy(mqtt_server, json["mqtt_server"]);
           strcpy(mqtt_port_config, json["mqtt_port"]);
+          strcpy(mqtt_user, json["mqtt_user"]);
+          strcpy(mqtt_password, json["mqtt_password"]);
 
         } else {
           Serial.println("failed to load json config");
@@ -162,19 +167,16 @@ void fsInit() {
   //end read
 }
 
-
-WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 120);
-WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port_config, 5);
-
-void initWifiManager() {
-
-
   // The extra parameters to be configured (can be either global or just in the setup)
   // After connecting, parameter.getValue() will get you the configured value
   // id/name placeholder/prompt default length
-  // WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 120);
-  // WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port_config, 5);
-  // WiFiManagerParameter custom_blynk_token("blynk", "blynk token", blynk_token, 32);
+
+WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 120);
+WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port_config, 5);
+WiFiManagerParameter custom_mqtt_user("user", "mqtt user", mqtt_user, 120);
+WiFiManagerParameter custom_mqtt_password("password", "mqtt password", mqtt_password, 120);
+
+void initWifiManager() {
 
   //WiFiManager
   //Local intialization. Once its business is done, there is no need to keep it around
@@ -189,7 +191,8 @@ void initWifiManager() {
   //add all your parameters here
   wifiManager.addParameter(&custom_mqtt_server);
   wifiManager.addParameter(&custom_mqtt_port);
-  // wifiManager.addParameter(&custom_blynk_token);
+  wifiManager.addParameter(&custom_mqtt_user);
+  wifiManager.addParameter(&custom_mqtt_password);
 
   //reset settings - for testing
   //wifiManager.resetSettings();
@@ -229,6 +232,8 @@ void setup()
     //read updated parameters
     strcpy(mqtt_server, custom_mqtt_server.getValue());
     strcpy(mqtt_port_config, custom_mqtt_port.getValue());
+    strcpy(mqtt_user, custom_mqtt_user.getValue());
+    strcpy(mqtt_password, custom_mqtt_password.getValue());
     // strcpy(blynk_token, custom_blynk_token.getValue());
 
     // convert port
@@ -317,11 +322,13 @@ void reconnect() {
     ESP.reset();
   }
 
+  int cpt=10;
+
   // Loop until we're reconnected to MQTT server
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
-    if (client.connect(clientId)) {
+    if (client.connect(clientId, mqtt_user, mqtt_password)) {
       Serial.print("connected with id : ");
       Serial.println(clientId);
       // Once connected, publish an announcement...
@@ -334,6 +341,12 @@ void reconnect() {
         Serial.println(" failed");
       }
     } else {
+
+      if(--cpt==0){
+        wifiManager.startConfigPortal();
+        return;
+      }
+
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
