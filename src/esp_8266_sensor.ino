@@ -1,10 +1,9 @@
-#include <FS.h>                   //this needs to be first, or it all crashes and burns...
-
 //needed for library
 #include <DNSServer.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
+#include <EEPROM.h>
 
 #include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
 
@@ -47,13 +46,18 @@ byte buff[2];
 
 Adafruit_BMP085_Unified bmp;
 
-// MQTT
-const char config_path[20] = "/config.json";
-char mqtt_server[120]="mqtt.broker.net";
-char mqtt_port_config[6]="1883";
-char mqtt_user[120]="";
-char mqtt_password[120]="";
-int mqtt_port = 1883;
+// MQTT Settings
+#define EEPROM_SALT 311276 // to check version
+typedef struct {
+  char mqtt_server[120]   = "";
+  char mqtt_port[6]       = "1883";
+  char mqtt_user[120]     = "";
+  char mqtt_password[120] = "";
+  int  salt               = EEPROM_SALT;
+} WMSettings;
+
+WMSettings settings;
+
 const String topicCmd    = "esp/" + String(ESP.getChipId()) + "/cmd";
 const String topicStatus = "esp/" + String(ESP.getChipId()) + "/status";
 const String clientId = "ESP8266Client" + String(ESP.getChipId()) ;
@@ -77,6 +81,14 @@ char topic[50];
 
 /** flag for saving data */
 bool shouldSaveConfig = false;
+// The extra parameters to be configured (can be either global or just in the setup)
+// After connecting, parameter.getValue() will get you the configured value
+// id/name placeholder/prompt default length
+
+WiFiManagerParameter custom_mqtt_server("server", "mqtt server", settings.mqtt_server, 120);
+WiFiManagerParameter custom_mqtt_port("port", "mqtt port", settings.mqtt_port, 6);
+WiFiManagerParameter custom_mqtt_user("user", "mqtt user", settings.mqtt_user, 120);
+WiFiManagerParameter custom_mqtt_password("password", "mqtt password", settings.mqtt_password, 120);
 
 void info(){
     Serial.println("sensor to mqtt");
@@ -84,13 +96,13 @@ void info(){
     Serial.println(PRJ_VERSION);
     Serial.println();
     Serial.print("mqtt: ");
-    Serial.print(mqtt_server);
+    Serial.print(settings.mqtt_server);
     Serial.print(":");
-    Serial.println(mqtt_port);
+    Serial.println(settings.mqtt_port);
     Serial.print("mqtt user: ");
-    Serial.print(mqtt_user);
+    Serial.print(settings.mqtt_user);
     Serial.print("/");
-    Serial.println(mqtt_password);
+    Serial.println(settings.mqtt_password);
     Serial.print("topics: ");
     Serial.print(topicStatus);
     Serial.print(" , ");
@@ -107,100 +119,44 @@ void saveConfigCallback () {
 
 //save the custom parameters to FS
 void doSaveConfig() {
+
   if (shouldSaveConfig) {
     Serial.println("saving config");
-    DynamicJsonBuffer jsonBuffer;
-    JsonObject& json = jsonBuffer.createObject();
-    json["mqtt_server"] = mqtt_server;
-    json["mqtt_port"] = mqtt_port;
-    json["mqtt_user"] = mqtt_user;
-    json["mqtt_password"] = mqtt_password;
 
-    File configFile = SPIFFS.open(config_path, "w");
-    if (!configFile) {
-      Serial.println("failed to open config file for writing");
-    }
+    strcpy(settings.mqtt_server, custom_mqtt_server.getValue());
+    strcpy(settings.mqtt_port, custom_mqtt_port.getValue());
+    strcpy(settings.mqtt_user, custom_mqtt_user.getValue());
+    strcpy(settings.mqtt_password, custom_mqtt_password.getValue());
 
-    json.printTo(Serial);
-    json.printTo(configFile);
-    configFile.close();
+    EEPROM.begin(512);
+    EEPROM.put(0, settings);
+    EEPROM.end();
+
     //end save
   }else {
     Serial.println("do not save config");
   }
 }
 
-void fsInit() {
+void configInit() {
+  Serial.println("configInit");
 
-  Serial.println("fsInit");
-  //clean FS, for testing
-  //SPIFFS.format();
-
-  //read configuration from FS json
-  Serial.println("mounting FS...");
-
-  if (SPIFFS.begin()) {
-    Serial.println("mounted file system");
-    if (SPIFFS.exists(config_path)) {
-      //file exists, reading and loading
-      Serial.println("reading config file");
-      File configFile = SPIFFS.open(config_path, "r");
-      if (configFile) {
-        Serial.println("opened config file");
-        size_t size = configFile.size();
-        // Allocate a buffer to store contents of the file.
-        std::unique_ptr<char[]> buf(new char[size]);
-
-        configFile.readBytes(buf.get(), size);
-        DynamicJsonBuffer jsonBuffer;
-        JsonObject& json = jsonBuffer.parseObject(buf.get());
-        json.printTo(Serial);
-        if (json.success()) {
-          Serial.println("\nparsed json");
-
-          strcpy(mqtt_server, json["mqtt_server"]);
-          strcpy(mqtt_port_config, json["mqtt_port"]);
-          strcpy(mqtt_user, json["mqtt_user"]);
-          strcpy(mqtt_password, json["mqtt_password"]);
-
-          info();
-
-        } else {
-          Serial.println("failed to load json config");
-        }
-      }
-    }
-  } else {
-    Serial.println("failed to mount FS");
-  }
-  //end read
+  EEPROM.begin(512);
+  EEPROM.get(0, settings);
+  EEPROM.end();
 }
 
 void resetConfig() {
   Serial.println("Config : reset");
-
-  if (SPIFFS.begin() && SPIFFS.exists(config_path)) {
-    SPIFFS.remove(config_path);
-  }
-
-  WiFiManager wifiManager;
-  wifiManager.resetSettings();
-
+  WMSettings blank;
+  settings = blank;
+  // Forget Wifi setup
+  WiFi.disconnect(true);
 }
-
-
-  // The extra parameters to be configured (can be either global or just in the setup)
-  // After connecting, parameter.getValue() will get you the configured value
-  // id/name placeholder/prompt default length
-
-WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 120);
-WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port_config, 6);
-WiFiManagerParameter custom_mqtt_user("user", "mqtt user", mqtt_user, 120);
-WiFiManagerParameter custom_mqtt_password("password", "mqtt password", mqtt_password, 120);
 
 void initWifiManager() {
   Serial.println("initWifiManager");
-info();
+  info();
   //WiFiManager
   //Local intialization. Once its business is done, there is no need to keep it around
   WiFiManager wifiManager;
@@ -248,26 +204,15 @@ void setup()
     Serial.begin(115200);
     Serial.println("Setup");
 
-    fsInit();
+    // Setup
+    configInit();
     initWifiManager();
-
-    //read updated parameters
-    Serial.println("read custom config");
-    strcpy(mqtt_server, custom_mqtt_server.getValue());
-    strcpy(mqtt_port_config, custom_mqtt_port.getValue());
-    strcpy(mqtt_user, custom_mqtt_user.getValue());
-    strcpy(mqtt_password, custom_mqtt_password.getValue());
-
-    // convert port
-    mqtt_port = String(mqtt_port_config).toInt();
-
-    info();
-
     doSaveConfig();
+    info();
 
     // MQTT
     client.setCallback(callback);
-    client.setServer(mqtt_server, mqtt_port);
+    client.setServer(settings.mqtt_server, String(settings.mqtt_port).toInt());
     reconnect();
 
     //
@@ -352,7 +297,7 @@ void reconnect() {
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
-    if (client.connect(clientId.c_str(), mqtt_user, mqtt_password)) {
+    if (client.connect(clientId.c_str(), settings.mqtt_user, settings.mqtt_password)) {
       Serial.print("connected with id : ");
       Serial.println(clientId);
       // Once connected, publish an announcement...
