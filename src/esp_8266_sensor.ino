@@ -48,15 +48,15 @@ byte buff[2];
 Adafruit_BMP085_Unified bmp;
 
 // MQTT
-#define CLIENT_ID     "1"
+const char config_path[20] = "/config.json";
 char mqtt_server[120]="mqtt.broker.net";
-char mqtt_port_config[5]="1883";
+char mqtt_port_config[6]="1883";
 char mqtt_user[120]="";
 char mqtt_password[120]="";
 int mqtt_port = 1883;
-const char* topicCmd    = "/esp/1/cmd";
-const char* topicStatus = "/esp/1/status";
-const char* clientId    = "ESP8266Client1";
+const String topicCmd    = "esp/" + String(ESP.getChipId()) + "/cmd";
+const String topicStatus = "esp/" + String(ESP.getChipId()) + "/status";
+const String clientId = "ESP8266Client" + String(ESP.getChipId()) ;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -87,6 +87,10 @@ void info(){
     Serial.print(mqtt_server);
     Serial.print(":");
     Serial.println(mqtt_port);
+    Serial.print("mqtt user: ");
+    Serial.print(mqtt_user);
+    Serial.print("/");
+    Serial.println(mqtt_password);
     Serial.print("topics: ");
     Serial.print(topicStatus);
     Serial.print(" , ");
@@ -112,7 +116,7 @@ void doSaveConfig() {
     json["mqtt_user"] = mqtt_user;
     json["mqtt_password"] = mqtt_password;
 
-    File configFile = SPIFFS.open("/config.json", "w");
+    File configFile = SPIFFS.open(config_path, "w");
     if (!configFile) {
       Serial.println("failed to open config file for writing");
     }
@@ -121,11 +125,14 @@ void doSaveConfig() {
     json.printTo(configFile);
     configFile.close();
     //end save
+  }else {
+    Serial.println("do not save config");
   }
 }
 
 void fsInit() {
 
+  Serial.println("fsInit");
   //clean FS, for testing
   //SPIFFS.format();
 
@@ -134,10 +141,10 @@ void fsInit() {
 
   if (SPIFFS.begin()) {
     Serial.println("mounted file system");
-    if (SPIFFS.exists("/config.json")) {
+    if (SPIFFS.exists(config_path)) {
       //file exists, reading and loading
       Serial.println("reading config file");
-      File configFile = SPIFFS.open("/config.json", "r");
+      File configFile = SPIFFS.open(config_path, "r");
       if (configFile) {
         Serial.println("opened config file");
         size_t size = configFile.size();
@@ -156,6 +163,8 @@ void fsInit() {
           strcpy(mqtt_user, json["mqtt_user"]);
           strcpy(mqtt_password, json["mqtt_password"]);
 
+          info();
+
         } else {
           Serial.println("failed to load json config");
         }
@@ -167,17 +176,31 @@ void fsInit() {
   //end read
 }
 
+void resetConfig() {
+  Serial.println("Config : reset");
+
+  if (SPIFFS.begin() && SPIFFS.exists(config_path)) {
+    SPIFFS.remove(config_path);
+  }
+
+  WiFiManager wifiManager;
+  wifiManager.resetSettings();
+
+}
+
+
   // The extra parameters to be configured (can be either global or just in the setup)
   // After connecting, parameter.getValue() will get you the configured value
   // id/name placeholder/prompt default length
 
 WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 120);
-WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port_config, 5);
+WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port_config, 6);
 WiFiManagerParameter custom_mqtt_user("user", "mqtt user", mqtt_user, 120);
 WiFiManagerParameter custom_mqtt_password("password", "mqtt password", mqtt_password, 120);
 
 void initWifiManager() {
-
+  Serial.println("initWifiManager");
+info();
   //WiFiManager
   //Local intialization. Once its business is done, there is no need to keep it around
   WiFiManager wifiManager;
@@ -223,23 +246,24 @@ void initWifiManager() {
 void setup()
 {
     Serial.begin(115200);
+    Serial.println("Setup");
 
     fsInit();
-
     initWifiManager();
-    doSaveConfig();
 
     //read updated parameters
+    Serial.println("read custom config");
     strcpy(mqtt_server, custom_mqtt_server.getValue());
     strcpy(mqtt_port_config, custom_mqtt_port.getValue());
     strcpy(mqtt_user, custom_mqtt_user.getValue());
     strcpy(mqtt_password, custom_mqtt_password.getValue());
-    // strcpy(blynk_token, custom_blynk_token.getValue());
 
     // convert port
     mqtt_port = String(mqtt_port_config).toInt();
 
     info();
+
+    doSaveConfig();
 
     // MQTT
     client.setCallback(callback);
@@ -259,8 +283,8 @@ void setup()
 
     if (!bmp.begin()) {
       Serial.println("Could not find a valid BMP180 sensor, check wiring!");
-      // loop will force reboot
-      while (1) {}
+      // reboot
+      ESP.restart();
     }
     Serial.println("Sensor ready");
     displaySensorDetails();
@@ -322,20 +346,20 @@ void reconnect() {
     ESP.reset();
   }
 
-  int cpt=10;
+  int cpt=5;
 
   // Loop until we're reconnected to MQTT server
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
-    if (client.connect(clientId, mqtt_user, mqtt_password)) {
+    if (client.connect(clientId.c_str(), mqtt_user, mqtt_password)) {
       Serial.print("connected with id : ");
       Serial.println(clientId);
       // Once connected, publish an announcement...
-      client.publish(topicStatus, "hello world");
+      client.publish(topicStatus.c_str(), "hello world");
       Serial.print("subscribing to : ");
       Serial.print(topicCmd);
-      if(client.subscribe(topicCmd)){
+      if(client.subscribe(topicCmd.c_str())){
         Serial.println(" succeeded");
       }else{
         Serial.println(" failed");
@@ -343,7 +367,8 @@ void reconnect() {
     } else {
 
       if(--cpt==0){
-        wifiManager.startConfigPortal();
+        resetConfig();
+        ESP.reset();
         return;
       }
 
@@ -385,19 +410,19 @@ void sendDatas(){
 
 void sendTemperature(float aTemperature){
   ftoa(msg, aTemperature, 2);
-  snprintf (topic, sizeof(topic), "%s/%s", topicStatus, "temperature");
+  snprintf (topic, sizeof(topic), "%s/%s", topicStatus.c_str(), "temperature");
   sendmsgToTopic();
 }
 
 void sendPressure(int aPresure){
   snprintf (msg, sizeof(msg), "%d", aPresure);
-  snprintf (topic, sizeof(topic), "%s/%s", topicStatus, "pressure");
+  snprintf (topic, sizeof(topic), "%s/%s", topicStatus.c_str(), "pressure");
   sendmsgToTopic();
 }
 
 void sendLight(uint16_t aLight){
   snprintf (msg, sizeof(msg), "%d", aLight);
-  snprintf (topic, sizeof(topic), "%s/%s", topicStatus, "light");
+  snprintf (topic, sizeof(topic), "%s/%s", topicStatus.c_str(), "light");
   sendmsgToTopic();
 }
 
