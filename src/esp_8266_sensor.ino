@@ -9,6 +9,8 @@
 
 // I2C sensors
 #include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
 #include <Adafruit_BMP085_U.h>
 // Display
 #include <TM1637Display.h>
@@ -235,7 +237,7 @@ void setup()
     displaySensorDetails();
 
     // première mesure
-    Serial.println("Lancement de la première mesure");
+    Serial.println("Starting first sensor reading");
     displayAllOff();
     work();
 
