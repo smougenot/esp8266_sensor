@@ -12,12 +12,13 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include <Adafruit_BMP085_U.h>
+#include <Adafruit_VEML6070.h>
 // Display
 #include <TM1637Display.h>
 // send MQTT messages
 #include <PubSubClient.h>
 
-#define PRJ_VERSION 2
+#define PRJ_VERSION 3
 
 // wait time (ms)
 #define LOOP_WAIT 60 * 100
@@ -47,6 +48,10 @@ byte buff[2];
 // XCLR is a reset pin, also not used here
 
 Adafruit_BMP085_Unified bmp;
+boolean bmp_available=false;
+
+// VEML6070
+Adafruit_VEML6070 uv = Adafruit_VEML6070();
 
 // MQTT Settings
 #define EEPROM_SALT 311276 // to check version
@@ -72,6 +77,7 @@ float temperature = -1;
 float altitude = -1;
 int pressure = -1;
 uint16_t light = 0;
+uint16_t uvLight = 0;
 
 short loopCnt = 0;
 // timing
@@ -228,7 +234,12 @@ void setup()
     Serial.println("Setting sensor");
     Wire.pins(IC_DATA, IC_CLK);
 
-    if (!bmp.begin()) {
+    // pass in the integration time constant
+    // higher increase accuracy but takes more time
+    uv.begin(VEML6070_2_T);
+
+    bmp_available=bmp.begin();
+    if (!bmp_available) {
       Serial.println("Could not find a valid BMP180 sensor, check wiring!");
       // reboot
       ESP.restart();
@@ -353,6 +364,7 @@ void sendDatas(){
   sendTemperature(temperature);
   sendPressure(pressure);
   sendLight(light);
+  sendUVLight(uvLight);
 }
 
 void sendTemperature(float aTemperature){
@@ -373,6 +385,12 @@ void sendLight(uint16_t aLight){
   sendmsgToTopic();
 }
 
+void sendUVLight(uint16_t aUvLight){
+  snprintf (msg, sizeof(msg), "%d", aUvLight);
+  snprintf (topic, sizeof(topic), "%s/%s", topicStatus.c_str(), "UV");
+  sendmsgToTopic();
+}
+
 void sendmsgToTopic(){
   Serial.print("Publish on: ");
   Serial.print(topic);
@@ -383,29 +401,20 @@ void sendmsgToTopic(){
 
 void readSensor(){
     //Serial.println("Read bpm180");
-    sensors_event_t event;
-    bmp.getEvent(&event);
-
-    // Do we have datas
-    if (event.pressure) {
-      float myTemperature;
-      bmp.getTemperature(&myTemperature);
-      if(myTemperature<150){
-        // assumed correct read
-        temperature = myTemperature;
-        pressure = event.pressure;
-        altitude = bmp.pressureToAltitude(
-          SENSORS_PRESSURE_SEALEVELHPA,
-          event.pressure
-        );
-      }
-    }
+    readAtmosphere();
     //Serial.println("Read bh1750");
     uint16_t myLight = readLight();
     if(myLight>=0){
       // assumed correct read
       light = myLight;
     }
+    //Serial.println("Read VEML6070");
+    uint16_t myUvLight = readUvLight();
+    if(myUvLight>=0){
+      // assumed correct read
+      uvLight = myUvLight;
+    }
+
 }
 /**************************************************************************/
 /*
@@ -427,6 +436,30 @@ void displaySensorDetails(void) {
   Serial.println("------------------------------------");
   Serial.println("");
   delay(500);
+}
+
+void readAtmosphere() {
+    //Serial.println("Read bpm180");
+    if(!bmp_available){
+      return;
+    }
+    sensors_event_t event;
+    bmp.getEvent(&event);
+
+    // Do we have datas
+    if (event.pressure) {
+      float myTemperature;
+      bmp.getTemperature(&myTemperature);
+      if(myTemperature<150){
+        // assumed correct read
+        temperature = myTemperature;
+        pressure = event.pressure;
+        altitude = bmp.pressureToAltitude(
+          SENSORS_PRESSURE_SEALEVELHPA,
+          event.pressure
+        );
+      }
+    }
 }
 
 int BH1750_Read(int address) //
@@ -466,26 +499,32 @@ uint16_t readLight(){
   return val;
 }
 
+uint16_t readUvLight(){
+  return uv.readUV();
+}
+
 void trace(){
     // DISPLAY DATA
     if(loopCnt++ %20 == 0){
       printHeader();
     }
-    printData(temperature, pressure, altitude, light);
+    printData(temperature, pressure, altitude, light, uvLight);
 }
 
-void printData(float aTemperature, int aPressure, float aAltitude, uint16_t aLight){
+void printData(float aTemperature, int aPressure, float aAltitude, uint16_t aLight, uint16_t aUvLight){
   Serial.print(aTemperature);
   Serial.print("\t");
   Serial.print(aPressure);
   Serial.print("\t");
   Serial.print(aAltitude);
   Serial.print("\t");
-  Serial.println(aLight);
+  Serial.print(aLight);
+  Serial.print("\t");
+  Serial.println(aUvLight);
 }
 
 void printHeader(){
-  Serial.println("Temperature °C\tPressure\tAltitude\tlight");
+  Serial.println("Temperature °C\tPressure\tAltitude\tlight\tUV");
 }
 
 
