@@ -1,15 +1,16 @@
-#include <FS.h>                   //this needs to be first, or it all crashes and burns...
-
 //needed for library
 #include <DNSServer.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager
+#include <EEPROM.h>
 
 #include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
 
 // I2C sensors
 #include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
 #include <Adafruit_BMP085_U.h>
 // Display
 #include <TM1637Display.h>
@@ -47,14 +48,21 @@ byte buff[2];
 
 Adafruit_BMP085_Unified bmp;
 
-// MQTT
-#define CLIENT_ID     "1"
-char mqtt_server[120]="mqtt.broker.net";
-char mqtt_port_config[5]="1883";
-int mqtt_port = 1883;
-const char* topicCmd    = "/esp/1/cmd";
-const char* topicStatus = "/esp/1/status";
-const char* clientId    = "ESP8266Client1";
+// MQTT Settings
+#define EEPROM_SALT 311276 // to check version
+typedef struct {
+  char mqtt_server[120]   = "";
+  char mqtt_port[6]       = "1883";
+  char mqtt_user[120]     = "";
+  char mqtt_password[120] = "";
+  int  salt               = EEPROM_SALT;
+} WMSettings;
+
+WMSettings settings;
+
+const String topicCmd    = "esp/" + String(ESP.getChipId()) + "/cmd";
+const String topicStatus = "esp/" + String(ESP.getChipId()) + "/status";
+const String clientId = "ESP8266Client" + String(ESP.getChipId()) ;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -75,6 +83,14 @@ char topic[50];
 
 /** flag for saving data */
 bool shouldSaveConfig = false;
+// The extra parameters to be configured (can be either global or just in the setup)
+// After connecting, parameter.getValue() will get you the configured value
+// id/name placeholder/prompt default length
+
+WiFiManagerParameter custom_mqtt_server("server", "mqtt server", settings.mqtt_server, 120);
+WiFiManagerParameter custom_mqtt_port("port", "mqtt port", settings.mqtt_port, 6);
+WiFiManagerParameter custom_mqtt_user("user", "mqtt user", settings.mqtt_user, 120);
+WiFiManagerParameter custom_mqtt_password("password", "mqtt password", settings.mqtt_password, 120);
 
 void info(){
     Serial.println("sensor to mqtt");
@@ -82,9 +98,13 @@ void info(){
     Serial.println(PRJ_VERSION);
     Serial.println();
     Serial.print("mqtt: ");
-    Serial.print(mqtt_server);
+    Serial.print(settings.mqtt_server);
     Serial.print(":");
-    Serial.println(mqtt_port);
+    Serial.println(settings.mqtt_port);
+    Serial.print("mqtt user: ");
+    Serial.print(settings.mqtt_user);
+    Serial.print("/");
+    Serial.println(settings.mqtt_password);
     Serial.print("topics: ");
     Serial.print(topicStatus);
     Serial.print(" , ");
@@ -101,81 +121,44 @@ void saveConfigCallback () {
 
 //save the custom parameters to FS
 void doSaveConfig() {
+
   if (shouldSaveConfig) {
     Serial.println("saving config");
-    DynamicJsonBuffer jsonBuffer;
-    JsonObject& json = jsonBuffer.createObject();
-    json["mqtt_server"] = mqtt_server;
-    json["mqtt_port"] = mqtt_port;
-    // json["blynk_token"] = blynk_token;
 
-    File configFile = SPIFFS.open("/config.json", "w");
-    if (!configFile) {
-      Serial.println("failed to open config file for writing");
-    }
+    strcpy(settings.mqtt_server, custom_mqtt_server.getValue());
+    strcpy(settings.mqtt_port, custom_mqtt_port.getValue());
+    strcpy(settings.mqtt_user, custom_mqtt_user.getValue());
+    strcpy(settings.mqtt_password, custom_mqtt_password.getValue());
 
-    json.printTo(Serial);
-    json.printTo(configFile);
-    configFile.close();
+    EEPROM.begin(512);
+    EEPROM.put(0, settings);
+    EEPROM.end();
+
     //end save
+  }else {
+    Serial.println("do not save config");
   }
 }
 
-void fsInit() {
+void configInit() {
+  Serial.println("configInit");
 
-  //clean FS, for testing
-  //SPIFFS.format();
-
-  //read configuration from FS json
-  Serial.println("mounting FS...");
-
-  if (SPIFFS.begin()) {
-    Serial.println("mounted file system");
-    if (SPIFFS.exists("/config.json")) {
-      //file exists, reading and loading
-      Serial.println("reading config file");
-      File configFile = SPIFFS.open("/config.json", "r");
-      if (configFile) {
-        Serial.println("opened config file");
-        size_t size = configFile.size();
-        // Allocate a buffer to store contents of the file.
-        std::unique_ptr<char[]> buf(new char[size]);
-
-        configFile.readBytes(buf.get(), size);
-        DynamicJsonBuffer jsonBuffer;
-        JsonObject& json = jsonBuffer.parseObject(buf.get());
-        json.printTo(Serial);
-        if (json.success()) {
-          Serial.println("\nparsed json");
-
-          strcpy(mqtt_server, json["mqtt_server"]);
-          strcpy(mqtt_port_config, json["mqtt_port"]);
-
-        } else {
-          Serial.println("failed to load json config");
-        }
-      }
-    }
-  } else {
-    Serial.println("failed to mount FS");
-  }
-  //end read
+  EEPROM.begin(512);
+  EEPROM.get(0, settings);
+  EEPROM.end();
 }
 
-
-WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 120);
-WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port_config, 5);
+void resetConfig() {
+  Serial.println("Config : reset");
+  WMSettings blank;
+  settings = blank;
+  // Forget Wifi setup
+  WiFi.disconnect(true);
+}
 
 void initWifiManager() {
-
-
-  // The extra parameters to be configured (can be either global or just in the setup)
-  // After connecting, parameter.getValue() will get you the configured value
-  // id/name placeholder/prompt default length
-  // WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 120);
-  // WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port_config, 5);
-  // WiFiManagerParameter custom_blynk_token("blynk", "blynk token", blynk_token, 32);
-
+  Serial.println("initWifiManager");
+  info();
   //WiFiManager
   //Local intialization. Once its business is done, there is no need to keep it around
   WiFiManager wifiManager;
@@ -189,7 +172,8 @@ void initWifiManager() {
   //add all your parameters here
   wifiManager.addParameter(&custom_mqtt_server);
   wifiManager.addParameter(&custom_mqtt_port);
-  // wifiManager.addParameter(&custom_blynk_token);
+  wifiManager.addParameter(&custom_mqtt_user);
+  wifiManager.addParameter(&custom_mqtt_password);
 
   //reset settings - for testing
   //wifiManager.resetSettings();
@@ -220,25 +204,17 @@ void initWifiManager() {
 void setup()
 {
     Serial.begin(115200);
+    Serial.println("Setup");
 
-    fsInit();
-
+    // Setup
+    configInit();
     initWifiManager();
     doSaveConfig();
-
-    //read updated parameters
-    strcpy(mqtt_server, custom_mqtt_server.getValue());
-    strcpy(mqtt_port_config, custom_mqtt_port.getValue());
-    // strcpy(blynk_token, custom_blynk_token.getValue());
-
-    // convert port
-    mqtt_port = String(mqtt_port_config).toInt();
-
     info();
 
     // MQTT
     client.setCallback(callback);
-    client.setServer(mqtt_server, mqtt_port);
+    client.setServer(settings.mqtt_server, String(settings.mqtt_port).toInt());
     reconnect();
 
     //
@@ -254,14 +230,14 @@ void setup()
 
     if (!bmp.begin()) {
       Serial.println("Could not find a valid BMP180 sensor, check wiring!");
-      // loop will force reboot
-      while (1) {}
+      // reboot
+      ESP.restart();
     }
     Serial.println("Sensor ready");
     displaySensorDetails();
 
     // première mesure
-    Serial.println("Lancement de la première mesure");
+    Serial.println("Starting first sensor reading");
     displayAllOff();
     work();
 
@@ -317,23 +293,32 @@ void reconnect() {
     ESP.reset();
   }
 
+  int cpt=5;
+
   // Loop until we're reconnected to MQTT server
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
-    if (client.connect(clientId)) {
+    if (client.connect(clientId.c_str(), settings.mqtt_user, settings.mqtt_password)) {
       Serial.print("connected with id : ");
       Serial.println(clientId);
       // Once connected, publish an announcement...
-      client.publish(topicStatus, "hello world");
+      client.publish(topicStatus.c_str(), "hello world");
       Serial.print("subscribing to : ");
       Serial.print(topicCmd);
-      if(client.subscribe(topicCmd)){
+      if(client.subscribe(topicCmd.c_str())){
         Serial.println(" succeeded");
       }else{
         Serial.println(" failed");
       }
     } else {
+
+      if(--cpt==0){
+        resetConfig();
+        ESP.reset();
+        return;
+      }
+
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
@@ -372,19 +357,19 @@ void sendDatas(){
 
 void sendTemperature(float aTemperature){
   ftoa(msg, aTemperature, 2);
-  snprintf (topic, sizeof(topic), "%s/%s", topicStatus, "temperature");
+  snprintf (topic, sizeof(topic), "%s/%s", topicStatus.c_str(), "temperature");
   sendmsgToTopic();
 }
 
 void sendPressure(int aPresure){
   snprintf (msg, sizeof(msg), "%d", aPresure);
-  snprintf (topic, sizeof(topic), "%s/%s", topicStatus, "pressure");
+  snprintf (topic, sizeof(topic), "%s/%s", topicStatus.c_str(), "pressure");
   sendmsgToTopic();
 }
 
 void sendLight(uint16_t aLight){
   snprintf (msg, sizeof(msg), "%d", aLight);
-  snprintf (topic, sizeof(topic), "%s/%s", topicStatus, "light");
+  snprintf (topic, sizeof(topic), "%s/%s", topicStatus.c_str(), "light");
   sendmsgToTopic();
 }
 
