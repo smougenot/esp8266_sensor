@@ -32,6 +32,7 @@ Provide a **simple** usage of sensors (hardware) with a **simple** way to publis
 | BME280   |       | Sensor : temperature, pressure and humidity |
 | BH1750   |       | Sensor : light |
 | SHT21    |       | Sensor : temperature and humidity  |
+| VEML6070 |       | Sensor : UV light |
 
 ### Build
 
