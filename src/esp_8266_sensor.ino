@@ -13,12 +13,13 @@
 #include <Adafruit_BME280.h>
 #include <Adafruit_BMP085_U.h>
 #include <Adafruit_VEML6070.h>
+#include <Sodaq_SHT2x.h>
 // Display
 #include <TM1637Display.h>
 // send MQTT messages
 #include <PubSubClient.h>
 
-#define PRJ_VERSION 3
+#define PRJ_VERSION 4
 
 // wait time (ms)
 #define LOOP_WAIT 60 * 100
@@ -78,6 +79,7 @@ float altitude = -1;
 int pressure = -1;
 uint16_t light = 0;
 uint16_t uvLight = 0;
+float humidity = -1;
 
 short loopCnt = 0;
 // timing
@@ -365,6 +367,7 @@ void sendDatas(){
   sendPressure(pressure);
   sendLight(light);
   sendUVLight(uvLight);
+  sendHumidity(humidity);
 }
 
 void sendTemperature(float aTemperature){
@@ -391,6 +394,12 @@ void sendUVLight(uint16_t aUvLight){
   sendmsgToTopic();
 }
 
+void sendHumidity(float aHumidity){
+  ftoa(msg, aHumidity, 2);
+  snprintf (topic, sizeof(topic), "%s/%s", topicStatus.c_str(), "humidity");
+  sendmsgToTopic();
+}
+
 void sendmsgToTopic(){
   Serial.print("Publish on: ");
   Serial.print(topic);
@@ -414,6 +423,8 @@ void readSensor(){
       // assumed correct read
       uvLight = myUvLight;
     }
+
+    humidity = readHumidity();
 
 }
 /**************************************************************************/
@@ -484,7 +495,6 @@ void BH1750_Init(int address)
 }
 
 uint16_t readLight(){
-  int i;
   uint16_t val=-1;
   BH1750_Init(BH1750address);
   delay(100);
@@ -503,15 +513,19 @@ uint16_t readUvLight(){
   return uv.readUV();
 }
 
+float readHumidity(){
+  return SHT2x.GetHumidity();
+}
+
 void trace(){
     // DISPLAY DATA
     if(loopCnt++ %20 == 0){
       printHeader();
     }
-    printData(temperature, pressure, altitude, light, uvLight);
+    printData(temperature, pressure, altitude, light, uvLight, humidity);
 }
 
-void printData(float aTemperature, int aPressure, float aAltitude, uint16_t aLight, uint16_t aUvLight){
+void printData(float aTemperature, int aPressure, float aAltitude, uint16_t aLight, uint16_t aUvLight, float aHumidity){
   Serial.print(aTemperature);
   Serial.print("\t");
   Serial.print(aPressure);
@@ -520,11 +534,13 @@ void printData(float aTemperature, int aPressure, float aAltitude, uint16_t aLig
   Serial.print("\t");
   Serial.print(aLight);
   Serial.print("\t");
-  Serial.println(aUvLight);
+  Serial.print(aUvLight);
+  Serial.print("\t");
+  Serial.println(aHumidity);
 }
 
 void printHeader(){
-  Serial.println("Temperature °C\tPressure\tAltitude\tlight\tUV");
+  Serial.println("Temperature °C\tPressure\tAltitude\tLight\tUV\tHumidity");
 }
 
 
