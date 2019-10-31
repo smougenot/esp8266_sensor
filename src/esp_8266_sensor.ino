@@ -11,9 +11,7 @@
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
-#include <Adafruit_BMP085_U.h>
 #include <Adafruit_VEML6070.h>
-#include <Sodaq_SHT2x.h>
 // Display
 #include <TM1637Display.h>
 // send MQTT messages
