@@ -48,8 +48,8 @@ byte buff[2];
 // EOC is not used, it signifies an end of conversion
 // XCLR is a reset pin, also not used here
 
-Adafruit_BMP085_Unified bmp;
-boolean bmp_available=false;
+Adafruit_BME280 bme;
+boolean bme_available=false;
 
 // VEML6070
 Adafruit_VEML6070 uv = Adafruit_VEML6070();
@@ -240,12 +240,13 @@ void setup()
     // higher increase accuracy but takes more time
     uv.begin(VEML6070_2_T);
 
-    bmp_available=bmp.begin();
-    if (!bmp_available) {
+    bme_available=bme.begin();
+    if (!bme_available) {
       Serial.println("Could not find a valid BMP180 sensor, check wiring!");
       // reboot
       ESP.restart();
     }
+
     Serial.println("Sensor ready");
     displaySensorDetails();
 
@@ -423,9 +424,6 @@ void readSensor(){
       // assumed correct read
       uvLight = myUvLight;
     }
-
-    humidity = readHumidity();
-
 }
 /**************************************************************************/
 /*
@@ -434,16 +432,9 @@ void readSensor(){
 */
 /**************************************************************************/
 void displaySensorDetails(void) {
-  sensor_t sensor;
-  bmp.getSensor(&sensor);
   Serial.println("------------------------------------");
-  Serial.println("              BMP                   ");
-  Serial.print  ("Sensor:       "); Serial.println(sensor.name);
-  Serial.print  ("Driver Ver:   "); Serial.println(sensor.version);
-  Serial.print  ("Unique ID:    "); Serial.println(sensor.sensor_id);
-  Serial.print  ("Max Value:    "); Serial.print(sensor.max_value); Serial.println(" hPa");
-  Serial.print  ("Min Value:    "); Serial.print(sensor.min_value); Serial.println(" hPa");
-  Serial.print  ("Resolution:   "); Serial.print(sensor.resolution); Serial.println(" hPa");
+  Serial.println("              BME                   ");
+  Serial.print  ("Unique ID:    "); Serial.println(bme.sensorID());
   Serial.println("------------------------------------");
   Serial.println("");
   delay(500);
@@ -451,26 +442,17 @@ void displaySensorDetails(void) {
 
 void readAtmosphere() {
     //Serial.println("Read bpm180");
-    if(!bmp_available){
+    if(!bme_available){
       return;
     }
-    sensors_event_t event;
-    bmp.getEvent(&event);
 
-    // Do we have datas
-    if (event.pressure) {
-      float myTemperature;
-      bmp.getTemperature(&myTemperature);
-      if(myTemperature<150){
-        // assumed correct read
-        temperature = myTemperature;
-        pressure = event.pressure;
-        altitude = bmp.pressureToAltitude(
-          SENSORS_PRESSURE_SEALEVELHPA,
-          event.pressure
-        );
-      }
-    }
+    // assumed correct read
+    temperature = bme.readTemperature();
+    pressure = bme.readPressure() / 100;
+    altitude = bme.readAltitude(
+      SENSORS_PRESSURE_SEALEVELHPA
+    );
+    humidity = bme.readHumidity();
 }
 
 int BH1750_Read(int address) //
@@ -513,9 +495,9 @@ uint16_t readUvLight(){
   return uv.readUV();
 }
 
-float readHumidity(){
-  return SHT2x.GetHumidity();
-}
+// float readHumidity(){
+//   return SHT2x.GetHumidity();
+// }
 
 void trace(){
     // DISPLAY DATA
