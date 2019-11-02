@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.org/smougenot/esp8266_sensor.svg?branch=master)](https://travis-ci.org/smougenot/esp8266_sensor)
 [![Join the chat at https://gitter.im/smougenot/esp8266_sensor](https://badges.gitter.im/smougenot/esp8266_sensor.svg)](https://gitter.im/smougenot/esp8266_sensor?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![CodeFactor](https://www.codefactor.io/repository/github/smougenot/esp8266_sensor/badge)](https://www.codefactor.io/repository/github/smougenot/esp8266_sensor)
 
 # esp8266_sensor
 
