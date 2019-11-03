@@ -73,6 +73,7 @@ PubSubClient client(espClient);
 
 // Datas
 float temperature = -1;
+float temperature_calibration = 0;
 float altitude = -1;
 int pressure = -1;
 uint16_t light = 0;
@@ -244,6 +245,14 @@ void setup()
       // reboot
       ESP.restart();
     }
+    bme.setSampling(
+      Adafruit_BME280::MODE_NORMAL,
+      Adafruit_BME280::SAMPLING_X16,   // temperature
+      Adafruit_BME280::SAMPLING_X4,   // pressure
+      Adafruit_BME280::SAMPLING_X16,   // humidity
+      Adafruit_BME280::FILTER_X16,
+      Adafruit_BME280::STANDBY_MS_250 );
+    temperature_calibration = -2.1F;
 
     Serial.println("Sensor ready");
     displaySensorDetails();
@@ -445,7 +454,7 @@ void readAtmosphere() {
     }
 
     // assumed correct read
-    temperature = bme.readTemperature();
+    temperature = bme.readTemperature() + temperature_calibration;  
     pressure = bme.readPressure() / 100;
     altitude = bme.readAltitude(
       SENSORS_PRESSURE_SEALEVELHPA
