@@ -12,8 +12,6 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include <Adafruit_VEML6070.h>
-// Display
-#include <TM1637Display.h>
 // send MQTT messages
 #include <PubSubClient.h>
 
@@ -25,13 +23,6 @@
 // I2C pins
 #define IC_CLK  14
 #define IC_DATA 12
-
-// display pins
-#define CLK   2
-#define DATA  0
-
-// Display
-TM1637Display display(CLK, DATA);
 
 //Sensor
 
@@ -224,13 +215,6 @@ void setup()
     client.setServer(settings.mqtt_server, String(settings.mqtt_port).toInt());
     reconnect();
 
-    //
-    // Display
-    //
-    display.setBrightness(0x0f);
-    // All segments on
-    displayAllOn();
-
     // Sensor
     Serial.println("Setting sensor");
     Wire.pins(IC_DATA, IC_CLK);
@@ -259,7 +243,6 @@ void setup()
 
     // première mesure
     Serial.println("Starting first sensor reading");
-    displayAllOff();
     work();
 
     Serial.println("Type,\tstatus,\tHumidity (%),\tTemperature (C)\tTime (us)");
@@ -353,7 +336,6 @@ void work(){
     Serial.println("work");
     readSensor();
     trace();
-    displayTemperature();
     sendDatas();
 }
 
@@ -530,43 +512,4 @@ void printData(float aTemperature, int aPressure, float aAltitude, uint16_t aLig
 
 void printHeader(){
   Serial.println("Temperature °C\tPressure\tAltitude\tLight\tUV\tHumidity");
-}
-
-
-/**
- * All segments on the display to on
- */
-void displayAllOn(){
-  // All segments on
-  displayAll(0xff);
-}
-
-/**
- * All segments on the display to off
- */
-void displayAllOff(){
-  // All segments off
-  displayAll(0);
-}
-
-/**
- * Display same pattern on all segments
- */
-void displayAll(uint8_t aValue){
-  // All segments on the same value
-  Serial.print("all to ");
-  Serial.println(aValue);
-  uint8_t data[] = { aValue, aValue, aValue, aValue };
-  display.setSegments(data);
-}
-
-/**
- * Display on the embedded hardware
- */
-void displayTemperature(){
-    //Serial.print("Display temperature : ");
-    //Serial.print(temperature, 1);
-    //Serial.println("°C");
-
-    display.showNumberDec(temperature * 10, false, 4, 0);
 }
