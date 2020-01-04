@@ -14,6 +14,8 @@
 #include <Adafruit_VEML6070.h>
 // send MQTT messages
 #include <PubSubClient.h>
+// Button management for soft reset
+#include <EasyButton.h>
 
 #define PRJ_VERSION 4
 
@@ -23,6 +25,9 @@
 // I2C pins
 #define IC_CLK  14
 #define IC_DATA 12
+
+// NodeMCU flash button pin
+#define BUTTON_PIN 0
 
 //Sensor
 
@@ -89,6 +94,8 @@ WiFiManagerParameter custom_mqtt_server("server", "mqtt server", settings.mqtt_s
 WiFiManagerParameter custom_mqtt_port("port", "mqtt port", settings.mqtt_port, 6);
 WiFiManagerParameter custom_mqtt_user("user", "mqtt user", settings.mqtt_user, 120);
 WiFiManagerParameter custom_mqtt_password("password", "mqtt password", settings.mqtt_password, 120);
+
+EasyButton button(BUTTON_PIN);
 
 void info(){
     Serial.println("sensor to mqtt");
@@ -183,19 +190,17 @@ void initWifiManager() {
   //sets timeout until configuration portal gets turned off
   //useful to make it all retry or go to sleep
   //in seconds
-  //wifiManager.setTimeout(120);
+  wifiManager.setConfigPortalTimeout(180);
 
   //fetches ssid and pass and tries to connect
   //if it does not connect it starts an access point with the specified name
-  //here  "AutoConnectAP"
-  //and goes into a blocking loop awaiting configuration
+  //and goes into a blocking loop awaiting configuration (untl timeout)
   String ssid = "ESP_autoconnect_" + String(ESP.getChipId());
   if (!wifiManager.autoConnect(ssid.c_str(), "password")) {
     Serial.println("failed to connect and hit timeout");
     delay(3000);
     //reset and try again, or maybe put it to deep sleep
     ESP.reset();
-    delay(5000);
   }
 }
 
@@ -210,10 +215,27 @@ void setup()
     doSaveConfig();
     info();
 
+    // Button init for soft reset
+    button.begin();
+    button.onPressed(buttonPressed);
+    if (button.supportsInterrupt()) {
+      button.enableInterrupt(buttonISR);
+      Serial.println("Button will be used through interrupts");
+    }
+    button.read();
+    Serial.println("Button status :");
+    Serial.print("    pressed  :");
+    Serial.println(button.isPressed());
+    Serial.print("    released :");
+    Serial.println(button.isReleased());
+    if (button.isPressed()) {
+      buttonPressed();
+    }
+    Serial.println("Button ready");
+   
     // MQTT
     client.setCallback(callback);
     client.setServer(settings.mqtt_server, String(settings.mqtt_port).toInt());
-    reconnect();
 
     // Sensor
     Serial.println("Setting sensor");
@@ -245,12 +267,13 @@ void setup()
     Serial.println("Starting first sensor reading");
     work();
 
-    Serial.println("Type,\tstatus,\tHumidity (%),\tTemperature (C)\tTime (us)");
+    Serial.println("Init sequence done, board ready with Wifi");
 }
 
 
 void loop()
 {
+  button.read();
 
   // check incomming/connection
   checkClient();
@@ -260,6 +283,19 @@ void loop()
     lastCheck = now;
     work();
   }
+}
+
+void buttonISR() {
+  Serial.println("Button Pressed : interrupt");
+  //When button is being used through external interrupts, parameter INTERRUPT must be passed to read() function
+  button.read(INTERRUPT);
+}
+
+void buttonPressed() {
+  Serial.println("Button Pressed : soft reset of the stored config");
+  resetConfig();
+  // reboot
+  ESP.restart();
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -294,6 +330,7 @@ void reconnect() {
 
   //reconnect wifi first
   if(WiFi.status() != WL_CONNECTED){
+    Serial.println("  no Wifi : reset");
     ESP.reset();
   }
 
@@ -318,7 +355,8 @@ void reconnect() {
     } else {
 
       if(--cpt==0){
-        resetConfig();
+        // resetConfig();
+        Serial.println("  no MQTT : reset");
         ESP.reset();
         return;
       }
@@ -336,7 +374,10 @@ void work(){
     Serial.println("work");
     readSensor();
     trace();
-    sendDatas();
+
+    if (client.connected()) {
+      sendDatas();
+    }
 }
 
 char *ftoa(char *a, double f, int precision){
@@ -421,12 +462,9 @@ void readSensor(){
 */
 /**************************************************************************/
 void displaySensorDetails(void) {
-  Serial.println("------------------------------------");
-  Serial.println("              BME                   ");
-  Serial.print  ("Unique ID:    "); Serial.println(bme.sensorID());
-  Serial.println("------------------------------------");
+  Serial.println("BME");
+  Serial.print  ("  Unique ID:    "); Serial.println(bme.sensorID());
   Serial.println("");
-  delay(500);
 }
 
 void readAtmosphere() {
