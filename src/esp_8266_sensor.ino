@@ -209,6 +209,9 @@ void setup()
     Serial.begin(115200);
     Serial.println("Setup");
 
+    Serial.print("Chip ID : ");
+    Serial.println(ESP.getChipId());
+
     // Setup
     configInit();
     initWifiManager();
@@ -402,30 +405,50 @@ void sendDatas(){
 }
 
 void sendTemperature(float aTemperature){
+  if (aTemperature > 200 || aTemperature < -100) {
+    Serial.println("Temperature ignored : " + String(aTemperature));
+    return;
+  }
   ftoa(msg, aTemperature, 2);
   snprintf (topic, sizeof(topic), "%s/%s", topicStatus.c_str(), "temperature");
   sendmsgToTopic();
 }
 
 void sendPressure(int aPresure){
+  if (aPresure > 2000) {
+    Serial.println("Pressure ignored : " + String(aPresure));
+    return;
+  }
   snprintf (msg, sizeof(msg), "%d", aPresure);
   snprintf (topic, sizeof(topic), "%s/%s", topicStatus.c_str(), "pressure");
   sendmsgToTopic();
 }
 
 void sendLight(uint16_t aLight){
+  if (aLight > 1000) {
+    Serial.println("Light ignored : " + String(aLight));
+    return;
+  }
   snprintf (msg, sizeof(msg), "%d", aLight);
   snprintf (topic, sizeof(topic), "%s/%s", topicStatus.c_str(), "light");
   sendmsgToTopic();
 }
 
 void sendUVLight(uint16_t aUvLight){
+  if (aUvLight > 5000) {
+    Serial.println("UV ignored : " + String(aUvLight));
+    return;
+  }
   snprintf (msg, sizeof(msg), "%d", aUvLight);
   snprintf (topic, sizeof(topic), "%s/%s", topicStatus.c_str(), "UV");
   sendmsgToTopic();
 }
 
 void sendHumidity(float aHumidity){
+  if (aHumidity > 100) {
+    Serial.println("Humidity ignored : " + String(aHumidity));
+    return;
+  }
   ftoa(msg, aHumidity, 2);
   snprintf (topic, sizeof(topic), "%s/%s", topicStatus.c_str(), "humidity");
   sendmsgToTopic();
