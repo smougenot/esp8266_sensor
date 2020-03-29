@@ -4,6 +4,15 @@
 
 # esp8266_sensor
 
+----
+
+**Obsolete**
+One should use [Tasmota](https://tasmota.github.io/docs/#/devices/) with great benefits!!!
+
+[Tasmota on Github](https://github.com/arendst/Tasmota)
+
+----
+
 ESP8266 micro controller and I2C connected sensors pushing messages over MQTT
 
 
